@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B2A6B"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png">
+<title>دست‌خط من</title>
+<style>
+:root{--ink:#1B2A6B;--acc:#3B6FE0;--bg:#FAF7F0;--tx:#2B2B2B;--ln:#E3DDCF;--ok:#2E7D4F;--wn:#B7791F;--er:#B3261E}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.7 Vazirmatn,"Noto Naskh Arabic","Noto Sans Arabic",system-ui,sans-serif;overflow-x:hidden}
+header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;display:flex;align-items:center;gap:8px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top))}
+header b{flex:1;font-size:18px}header button{background:none;border:0;color:#fff;font-size:22px;min-width:44px;min-height:44px}
+main{max-width:720px;margin:0 auto;padding:16px 14px 90px}h2{color:var(--ink);margin:.2em 0}
+.b,.b2,.bd{display:flex;align-items:center;justify-content:center;gap:6px;min-height:50px;padding:0 18px;border-radius:12px;border:0;font:inherit;font-weight:700;background:var(--ink);color:#fff;width:100%;margin:8px 0;cursor:pointer;text-align:center}
+.b2{background:#fff;color:var(--ink);border:1.5px solid var(--ink)}.bd{background:#fff;color:var(--er);border:1.5px solid var(--er)}.big{min-height:58px;font-size:18px}
+.row{display:flex;gap:8px}.row>*{flex:1}.card{background:#fff;border:1px solid var(--ln);border-radius:14px;padding:14px;margin:10px 0}
+.bar{height:8px;background:var(--ln);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+input,select,textarea{width:100%;font:inherit;padding:12px;border:1.5px solid var(--ln);border-radius:10px;background:#fff;min-height:48px}
+label.f{display:block;margin:10px 0 4px;font-weight:700}small,.mut{color:#6b6b6b}.hero{padding:18px 0}.hero h1{color:var(--ink);font-size:30px;margin:0}
+canvas{max-width:100%;touch-action:none;background:#fff;border:1px solid var(--ln);border-radius:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}.cell{background:#fff;border:1.5px solid var(--ln);border-radius:10px;text-align:center;padding:4px;font-size:12px;cursor:pointer}
+.cell.ok{border-color:var(--ok)}.cell.mid{border-color:var(--wn)}.cell.no{opacity:.6}.cell canvas{width:100%;height:64px;border:0}
+#md{position:fixed;inset:0;background:rgba(20,20,40,.55);display:none;align-items:flex-end;z-index:9}#md.on{display:flex}#md>div{background:var(--bg);width:100%;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+#ts{position:fixed;bottom:16px;inset-inline:14px;background:var(--ink);color:#fff;padding:12px 14px;border-radius:12px;display:none;z-index:20}#ts.er{background:var(--er)}
+.steps a{display:flex;gap:12px;align-items:center;padding:14px;background:#fff;border:1px solid var(--ln);border-radius:14px;margin:8px 0;color:inherit;text-decoration:none}.steps em{background:var(--ink);color:#fff;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;font-style:normal}
+#pv{border:1.5px solid var(--ln);background:#fff;border-radius:10px;padding:12px;min-height:90px;white-space:pre-wrap;overflow-wrap:anywhere}
+@media print{header,main>*:not(#pc){display:none}#pc canvas{border:0;width:100%}}
+</style></head><body>
+<header><button id=bk onclick="back()" aria-label="بازگشت">›</button><b id=tt>دست‌خط من</b></header>
+<main id=app></main><div id=md onclick="if(event.target===this)cm()"><div id=mdi></div></div><div id=ts></div>
+<script src="storage/zip.js"></script><script src="font-engine/ttf-builder.js"></script><script src="image-engine/image-engine.js"></script>
+<script>
+'use strict';
+const E=PersianTTF,I=ImageEngine,cells=I.cellList(),NP=Math.ceil(cells.length/I.PER),$=s=>document.querySelector(s);
+const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const S={p:null,v:'home',pg:0,src:null,q:null,wg:null,t:128};
+const db=new Promise((r,j)=>{const q=indexedDB.open('hw',1);q.onupgradeneeded=()=>q.result.createObjectStore('p',{keyPath:'id'});q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error)});
+const tx=async(m,f)=>{const d=await db;return new Promise((res,rej)=>{const t=d.transaction('p',m),r=f(t.objectStore('p'));t.oncomplete=()=>res(r.result);t.onerror=()=>rej(t.error)})};
+const all=()=>tx('readonly',s=>s.getAll()),put=p=>tx('readwrite',s=>s.put(p)),del=id=>tx('readwrite',s=>s.delete(id));
+const save=()=>{S.p.updated=Date.now();return put(S.p).catch(()=>toast('ذخیره‌سازی ناموفق بود. فضای گوشی را بررسی کنید و پشتیبان بگیرید.',1))};
+let tt;function toast(m,er){const t=$('#ts');t.textContent=m;t.className=er?'er':'';t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',er?6000:2500)}
+const H=(s,t)=>{$('#app').innerHTML=s;$('#tt').textContent=t||'دست‌خط من';$('#bk').style.visibility=S.v==='home'?'hidden':'visible';scrollTo(0,0)};
+const go=v=>{S.v=v;V[v]()},back=()=>go(['hub','new'].includes(S.v)?'home':S.p?'hub':'home');
+const M=h=>{$('#mdi').innerHTML=h;$('#md').className='on'},cm=()=>{S.stream&&S.stream.getTracks().forEach(t=>t.stop());S.stream=null;$('#md').className=''};
+const prog=p=>Math.round(100*Object.values(p.glyphs||{}).filter(g=>g.ok).length/cells.length);
+const dl=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)};
+const ago=t=>new Date(t).toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short'});
+
+const V={
+async set(){let q='نامشخص';try{const e=await navigator.storage.estimate();q=fa(Math.round(e.usage/1048576))+' مگابایت از '+fa(Math.round(e.quota/1048576))+' مگابایت'}catch(_){}
+ const pr=navigator.storage&&navigator.storage.persisted?await navigator.storage.persisted():false;
+ H(`<h2>تنظیمات</h2><div class=card><b>حریم خصوصی</b><p class=mut>همهٔ تصاویر، نمونه‌ها و فونت‌ها فقط روی همین دستگاه (IndexedDB) ذخیره می‌شوند. برنامه هیچ داده‌ای به سرور ارسال نمی‌کند و حساب کاربری یا کلید API ندارد.</p></div>
+ <div class=card><b>فضای ذخیره‌سازی</b><p class=mut>مصرف فعلی: ${q}<br>ذخیرهٔ پایدار: ${pr?'فعال':'غیرفعال'}</p><button class=b2 onclick="persist()">درخواست ذخیرهٔ پایدار</button></div>
+ <div class=card><b>حافظهٔ آفلاین برنامه</b><p class=mut>اگر نسخهٔ جدید برنامه اعمال نمی‌شود، حافظهٔ آفلاین را پاک کنید (پروژه‌ها حذف نمی‌شوند).</p><button class=bd onclick="clrCache()">پاک‌کردن حافظهٔ آفلاین و بارگذاری مجدد</button></div>
+ <p class=mut>نسخهٔ برنامه: ۱٫۰ · فرمت خروجی: TrueType (TTF)</p>`,'تنظیمات')},
+async home(){S.p=null;const l=(await all()).sort((a,b)=>b.updated-a.updated);
+ H(`<div class=hero><h1>دست‌خط من</h1><p>دست‌خط خود را به یک فونت فارسی TTF تبدیل کنید. تصویرها و پروژه‌ها فقط روی همین گوشی می‌مانند و به هیچ سروری ارسال نمی‌شوند.</p></div>
+ <button class="b big" onclick="go('new')">ساخت فونت جدید</button><button class=b2 onclick="go('set')">تنظیمات و حریم خصوصی</button>`+
+ (l.length?l.map(p=>`<div class=card><b>${esc(p.name)}</b> <small>· ${esc(p.style)}</small><div class=bar style="margin:8px 0"><i style="width:${prog(p)}%"></i></div>
+ <small>پیشرفت ${fa(prog(p))}٪ · آخرین ویرایش ${ago(p.updated)}</small><div class=row><button class=b onclick="open_('${p.id}')">ادامه</button><button class=bd onclick="delP('${p.id}')">حذف</button></div></div>`).join(''):
+ `<div class=card><b>هنوز پروژه‌ای ندارید</b><p class=mut>۱) برگهٔ نمونه‌نویسی را بسازید ۲) روی کاغذ بنویسید ۳) عکس بگیرید ۴) فونت را دریافت کنید.</p></div>`)+
+ `<label class=b2>بازیابی از فایل پشتیبان<input type=file accept=".zip,.json" hidden onchange="imp(this.files[0])"></label>`)},
+new(){H(`<h2>پروژهٔ جدید</h2><label class=f>نام فونت</label><input id=n value="دست‌خط من"><label class=f>نام سازنده</label><input id=d>
+ <label class=f>سبک (فقط برای دسته‌بندی)</label><select id=s><option>دست‌خط روزمره<option>دست‌خط رسمی<option>دست‌خط آزاد<option>دست‌خط فانتزی</select>
+ <label class=f>توضیح (اختیاری)</label><textarea id=x></textarea><button class=b onclick="mk()">ایجاد پروژه</button>`,'پروژهٔ جدید')},
+hub(){const p=S.p,n=Object.values(p.glyphs).filter(g=>g.ok).length;
+ H(`<div class=card><b>${esc(p.name)}</b><div class=bar style="margin:8px 0"><i style="width:${prog(p)}%"></i></div><small>${fa(n)} از ${fa(cells.length)} گلیف تأیید شده (${fa(prog(p))}٪)</small></div><div class=steps>
+ <a href="#" onclick="go('sheet');return false"><em>۱</em><span><b>برگهٔ نمونه‌نویسی</b><br><small>نمایش، PNG و چاپ/PDF</small></span></a>
+ <a href="#" onclick="go('imp');return false"><em>۲</em><span><b>ورود تصویر</b><br><small>دوربین یا گالری، تنظیم گوشه‌ها</small></span></a>
+ <a href="#" onclick="go('gl');return false"><em>۳</em><span><b>بررسی و ویرایش گلیف‌ها</b><br><small>تأیید، جابه‌جایی، حذف</small></span></a>
+ <a href="#" onclick="go('pv');return false"><em>۴</em><span><b>پیش‌نمایش زنده</b><br><small>متن دلخواه با فونت خودتان</small></span></a>
+ <a href="#" onclick="go('ex');return false"><em>۵</em><span><b>خروجی و پشتیبان</b><br><small>TTF، پشتیبان، گزارش</small></span></a></div>`,p.name)},
+sheet(){H(`<h2>برگهٔ نمونه‌نویسی</h2><p class=mut>هر خانه را با خودکار آبی یا مشکی روی کاغذ سفید A4 بنویسید. حرف ریز بالای خانه نشان می‌دهد کدام شکل را بنویسید (در شکل‌های ابتدا/میان/انتها، خط اتصال را تا لبهٔ خانه ادامه دهید). همهٔ حروف را روی خط مبنای خاکستری بنویسید. اگر چاپگر ندارید، برگه را روی گوشی باز بگذارید و به‌عنوان راهنما روی کاغذ خالی بنویسید؛ اما ورود تصویر به برگهٔ چاپ‌شده یا خط‌کشی‌شدهٔ هم‌اندازه نیاز دارد.</p>
+ <div class=row>${[...Array(NP)].map((_,i)=>`<button class="${i==S.pg?'b':'b2'}" onclick="S.pg=${i};go('sheet')">صفحهٔ ${fa(i+1)}</button>`).join('')}</div><div id=pc><canvas id=c></canvas></div>
+ <div class=row><button class=b2 onclick="$('#c').toBlob(b=>dl(b,'sheet-${S.pg+1}.png'))">ذخیره PNG</button><button class=b onclick="print()">چاپ / ذخیره PDF</button></div>`,'برگهٔ نمونه');drawSheet($('#c'),S.pg)},
+imp(){H(`<h2>ورود تصویر</h2><div class=card><b>قبل از عکس گرفتن</b><br>کاغذ روی سطح صاف · نور یکنواخت و بدون سایه · دوربین عمود بر کاغذ · هر ۴ گوشهٔ برگه در کادر · نوشته‌ها واضح.</div>
+ <label class=f>کدام صفحه؟</label><select id=pgs onchange="S.pg=+this.value">${[...Array(NP)].map((_,i)=>`<option value=${i} ${i==S.pg?'selected':''}>صفحهٔ ${fa(i+1)}</option>`).join('')}</select>
+ <button class="b big" onclick="cam()">دوربین با کادر راهنما</button><label class="b2">انتخاب از گالری یا دوربین سیستم<input type=file accept="image/*" hidden onchange="ld(this.files[0])"></label><div id=ws></div>`,'ورود تصویر')},
+gl(){const p=S.p,pgs=[...Array(NP)].map((_,i)=>i);
+ H(`<div class=row><button class=b onclick="okAll()">تأیید همهٔ نمونه‌های موجود</button></div><small>سبز: تأییدشده · نارنجی: نیازمند تأیید · کم‌رنگ: خالی</small><div class=grid>${cells.map((c,i)=>{const g=p.glyphs[c.name];return`<div class="cell ${g?g.ok?'ok':'mid':'no'}" onclick="ed(${i})"><canvas id=t${i}></canvas>${esc(c.text)} <small>${c.fn}</small></div>`}).join('')}</div>`,'گلیف‌ها');
+ cells.forEach((c,i)=>{const g=p.glyphs[c.name];if(g)dg($('#t'+i),g,c.form)})},
+pv:async()=>{H(`<h2>پیش‌نمایش زنده</h2><div id=pe class=card>در حال ساخت فونت…</div>`,'پیش‌نمایش');const r=await mkFont();if(!r)return;
+ $('#pe').outerHTML=`<select onchange="$('#in').value=this.value;up()"><option value="سلام، این اولین فونت فارسی من است.">نمونه ۱<option value="امروز می‌خواهم دست‌خط خودم را به یک فونت واقعی تبدیل کنم.">نمونه ۲<option value="می‌روم، کتاب‌ها، خانه‌ای، برنامه‌نویسی">نیم‌فاصله<option value="پژوهش، فناوری، زندگی، آینده">نمونه ۴<option value="۱۲۳۴۵۶۷۸۹۰">اعداد</select>
+ <textarea id=in rows=3 oninput=up()>سلام، این اولین فونت فارسی من است.</textarea><label class=f>اندازه</label><input id=sz type=range min=14 max=96 value=40 oninput=up()><label class=f>فاصلهٔ خطوط</label><input id=lh type=range min=10 max=30 value=18 oninput=up()>
+ <div id=wr class=card style="display:none;border-color:var(--wn);color:var(--wn)"></div><label class=f>با فونت شما</label><div id=pv></div><label class=f><input type=checkbox id=cp onchange=up() style="width:auto;min-height:0"> مقایسه با فونت پیش‌فرض</label><div id=pv2 class=card style="display:none"></div>
+ <p class=mut>گلیف‌های ناقص: ${fa(r.report.missing.length)} مورد (در گزارش خروجی فهرست شده‌اند)</p>`;up()},
+ex(){H(`<h2>خروجی</h2><div class=card><b>گلیف‌های تأییدشده: ${fa(Object.values(S.p.glyphs).filter(g=>g.ok).length)} از ${fa(cells.length)}</b><br><small>شکل‌های ناقص در فونت نمی‌آیند و حرف به شکل مستقل نمایش داده می‌شود.</small></div>
+ <button class="b big" onclick="outTTF()">دریافت فایل TTF</button><button class=b2 onclick="outBk()">پشتیبان کامل پروژه (ZIP با تصاویر)</button><button class=b2 onclick="outRep()">گزارش وضعیت و فهرست گلیف‌ها</button>
+ <p class=mut>ذخیره‌سازی مرورگر دائمی نیست؛ به‌طور مرتب پشتیبان بگیرید. برای نصب فونت روی اندروید، فایل TTF را در برنامه‌هایی که از فونت سفارشی پشتیبانی می‌کنند (مثل ویرایشگرهای تصویر و اسناد) بارگذاری کنید.</p>`,'خروجی')}};
+
+const persist=async()=>{try{toast(await navigator.storage.persist()?'ذخیرهٔ پایدار فعال شد':'مرورگر ذخیرهٔ پایدار را نپذیرفت؛ پشتیبان بگیرید.',0);go('set')}catch(_){toast('این مرورگر ذخیرهٔ پایدار را پشتیبانی نمی‌کند.',1)}};
+const clrCache=async()=>{if(!confirm('حافظهٔ آفلاین پاک و صفحه دوباره بارگذاری شود؟ (به اینترنت نیاز دارد)'))return;for(const k of await caches.keys())await caches.delete(k);for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();location.reload()};
+const mk=async()=>{const p={id:crypto.randomUUID(),name:$('#n').value.trim()||'دست‌خط من',designer:$('#d').value,style:$('#s').value,desc:$('#x').value,created:Date.now(),updated:Date.now(),glyphs:{}};await put(p);S.p=p;go('hub')};
+const open_=async id=>{S.p=(await all()).find(p=>p.id===id);go('hub')};
+const delP=async id=>{if(confirm('این پروژه و تمام نمونه‌هایش برای همیشه حذف شود؟')){await del(id);go('home')}};
+async function imp(f){if(!f)return;try{let p;if(/\.zip$/i.test(f.name)){const z=Z.read(await f.arrayBuffer());p=JSON.parse(new TextDecoder().decode(z['project.json']));p.imgs=(p.imgs||[]).map(x=>({pg:x.pg,blob:new Blob([z[x.file]],{type:'image/jpeg'})}))}else p=JSON.parse(await f.text());
+ if(!p.id||!p.glyphs)throw 0;const ex=(await all()).find(x=>x.id===p.id);if(ex&&!confirm('پروژه‌ای با همین شناسه وجود دارد. جایگزین شود؟'))return;await put(p);toast('پروژه بازیابی شد');go('home')}catch(e){toast('فایل پشتیبان معتبر نیست. فایل ZIP یا JSON ساخته‌شده توسط همین برنامه را انتخاب کنید.',1)}}
+function drawSheet(c,pg){c.width=I.PW;c.height=I.PH;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.direction='rtl';x.textAlign='right';
+ x.fillStyle='#1B2A6B';x.font='700 34px sans-serif';x.fillText('برگهٔ نمونه‌نویسی — صفحهٔ '+fa(pg+1)+' از '+fa(NP),I.PW-60,70);x.fillStyle='#777';x.font='20px sans-serif';x.fillText('با خودکار آبی یا مشکی داخل خانه بنویسید؛ بالای خط مبنا و زیر آن، بدون لمس لبه‌ها (جز خط اتصال)',I.PW-60,106);
+ for(let i=pg*I.PER;i<Math.min(cells.length,(pg+1)*I.PER);i++){const b=I.cellBox(i),a=I.exArea(i),c0=cells[i];x.strokeStyle='#bbb';x.lineWidth=1.5;x.strokeRect(b.x,b.y,b.w,b.h);
+ x.strokeStyle='#ccc';x.setLineDash([6,5]);x.beginPath();x.moveTo(a.x,a.y+.75*a.h);x.lineTo(a.x+a.w,a.y+.75*a.h);x.stroke();x.setLineDash([]);
+ x.fillStyle='#888';x.font='22px sans-serif';x.textAlign='right';x.fillText(c0.text+'  '+c0.fn,b.x+b.w-8,b.y+22);}}
+
+function ld(f){if(!f)return;S.blob=f;createImageBitmap(f).then(bm=>{const s=Math.min(1,2200/Math.max(bm.width,bm.height)),w=Math.round(bm.width*s),h=Math.round(bm.height*s),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.drawImage(bm,0,0,w,h);
+ const d=x.getImageData(0,0,w,h).data,g=new Uint8Array(w*h);for(let i=0;i<g.length;i++)g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+ S.src={g,w,h,c};const m=.08;S.q=[[w*m,h*m],[w*(1-m),h*m],[w*(1-m),h*(1-m)],[w*m,h*(1-m)]];const ac=I.autoCorners(g,w,h);S.auto=!!ac;if(ac)S.q=ac;cornerUI()}).catch(()=>toast('خواندن تصویر ممکن نشد. تصویر دیگری انتخاب کنید یا حافظهٔ آزاد کنید.',1))}
+async function cam(){try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:2560}}});
+ M(`<h2>دوربین</h2><div style="position:relative"><video id=vd autoplay playsinline muted style="width:100%;border-radius:10px;background:#000"></video><svg viewBox="0 0 100 140" preserveAspectRatio=none style="position:absolute;inset:0;width:100%;height:100%"><rect x=5 y=5 width=90 height=130 fill=none stroke="#fff" stroke-width=.8 stroke-dasharray="4 3"/></svg></div>
+ <small class=mut>هر ۴ گوشهٔ برگه داخل کادر · نور یکنواخت بدون سایه · دوربین عمود بر کاغذ · کاغذ روی سطح صاف</small><div class=row><button class=b onclick="snap()">ثبت عکس</button><button class=b2 onclick="cm()">بستن</button></div>`);$('#vd').srcObject=S.stream=st}
+ catch(e){toast('دوربین در دسترس نیست ('+(e.name||'خطا')+'). مجوز دوربین را برای Chrome فعال کنید یا از گالری انتخاب کنید.',1)}}
+function snap(){const v=$('#vd');if(!v.videoWidth)return toast('تصویر دوربین هنوز آماده نیست؛ چند لحظه صبر کنید.',1);const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);c.toBlob(b=>{cm();ld(b)},'image/jpeg',.92)}
+function cornerUI(){$('#ws').innerHTML=`<h2>گوشه‌های برگه</h2><p class=mut id=ai>${S.auto?'گوشه‌ها به‌صورت خودکار پیدا شدند؛ در صورت لزوم اصلاح کنید.':'تشخیص خودکار موفق نبود؛ گوشه‌ها را دستی تنظیم کنید.'}</p><p class=mut>چهار نقطه را با انگشت روی گوشه‌های کاغذ بکشید: بالا-راست، بالا-چپ، پایین-چپ، پایین-راست.</p><canvas id=cc></canvas><button class="b big" onclick="proc()">برش و اصلاح پرسپکتیو</button>`;
+ const c=$('#cc'),sc=Math.min(1,($('#app').clientWidth-4)/S.src.w);c.width=S.src.w*sc;c.height=S.src.h*sc;let dr=-1;const draw=()=>{const x=c.getContext('2d');x.drawImage(S.src.c,0,0,c.width,c.height);x.strokeStyle='#3B6FE0';x.lineWidth=3;x.beginPath();S.q.forEach((p,i)=>x[i?'lineTo':'moveTo'](p[0]*sc,p[1]*sc));x.closePath();x.stroke();S.q.forEach(p=>{x.fillStyle='rgba(59,111,224,.5)';x.beginPath();x.arc(p[0]*sc,p[1]*sc,16,0,7);x.fill()})};
+ const pt=e=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)*c.width/r.width/sc,(e.clientY-r.top)*c.height/r.height/sc]};
+ c.onpointerdown=e=>{const p=pt(e);let m=1e9;S.q.forEach((q,i)=>{const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<m){m=d;dr=i}});c.setPointerCapture(e.pointerId);S.q[dr]=p;draw()};c.onpointermove=e=>{if(dr>=0){S.q[dr]=pt(e);draw()}};c.onpointerup=()=>dr=-1;draw()}
+let WK;const wk=()=>{if(WK)WK.terminate();return WK=new Worker('workers/image-worker.js')};
+const busy=m=>$('#ws').innerHTML=`<div class=card><b id=bt>${m}</b><div class=bar style="margin:8px 0"><i id=bi style="width:5%"></i></div><button class=bd onclick="stopW()">لغو</button></div>`;
+function stopW(){if(WK){WK.terminate();WK=null}toast('عملیات لغو شد');S.src&&cornerUI()}
+const wErr=()=>{WK=null;toast('پردازش تصویر ناموفق بود. گوشه‌ها را دوباره تنظیم کنید یا عکس واضح‌تری بگیرید.',1);S.src&&cornerUI()};
+function proc(){busy('در حال اصلاح پرسپکتیو…');const w=wk();w.onerror=wErr;w.onmessage=e=>{WK=null;S.wg=e.data.wg;S.t=Math.max(60,Math.min(200,e.data.t-8));
+ $('#ws').innerHTML=`<h2>بررسی برش و آستانه</h2><p class=mut>کادرهای آبی باید روی خانه‌های برگه بیفتند؛ در غیر این صورت به مرحلهٔ قبل برگردید و گوشه‌ها را اصلاح کنید.</p><canvas id=pc2></canvas><label class=f>آستانهٔ سیاه‌وسفید</label><input id=th type=range min=40 max=220 value=${S.t} oninput="S.t=+this.value;bin()"><div class=row><button class=b2 onclick="cornerUI()">بازگشت</button><button class=b onclick="ext()">استخراج نمونه‌ها</button></div>`;bin()};
+ w.postMessage({type:'warp',g:S.src.g,w:S.src.w,h:S.src.h,q:S.q})}
+function bin(){const c=$('#pc2'),W=I.PW,s=.5;c.width=W*s;c.height=I.PH*s;const x=c.getContext('2d'),im=x.createImageData(c.width,c.height);for(let y=0;y<c.height;y++)for(let u=0;u<c.width;u++){const v=S.wg[(y*2)*W+u*2]<S.t?20:255,k=(y*c.width+u)*4;im.data[k]=im.data[k+1]=im.data[k+2]=v;im.data[k+3]=255}x.putImageData(im,0,0);x.strokeStyle='#3B6FE0';
+ for(let i=S.pg*I.PER;i<Math.min(cells.length,(S.pg+1)*I.PER);i++){const a=I.exArea(i);x.strokeRect(a.x*s,a.y*s,a.w*s,a.h*s)}}
+function ext(){busy('در حال استخراج نمونه‌ها…');const w=wk(),from=S.pg*I.PER,to=Math.min(cells.length,from+I.PER);w.onerror=wErr;
+ w.onmessage=async e=>{const m=e.data;if(m.type==='prog'){$('#bi').style.width=m.p+'%';$('#bt').textContent='در حال استخراج… '+fa(m.p)+'٪';return}WK=null;let n=0;
+  for(const[i,r]of m.res){if(r){S.p.glyphs[cells[i].name]={raw:r,t:{dx:0,dy:0,s:1,aw:0},ok:false};n++}else delete S.p.glyphs[cells[i].name]}
+  if(S.blob)S.p.imgs=(S.p.imgs||[]).filter(x=>x.pg!==S.pg).concat([{pg:S.pg,blob:S.blob}]);await save();toast(fa(n)+' نمونه استخراج شد. لطفاً آن‌ها را بررسی و تأیید کنید.');go('gl')};
+ w.postMessage({type:'ext',wg:S.wg,t:S.t,from,to})}
+function dg(c,g,form,sc){const gg=I.toGlyph(g.raw,form,g.t);sc=sc||1;const hgt=1100;c.height=sc>1?300:64;const k=c.height/hgt;c.width=Math.max(20,gg.adv*k+10);const x=c.getContext('2d');x.fillStyle='#222';x.beginPath();
+ gg.contours.forEach(r=>{const X=p=>5+p.x*k,Y=p=>c.height-(p.y+300)*k;x.moveTo(X(r[0]),Y(r[0]));for(let i=1;i<=r.length;i++){const q=r[i%r.length];if(q.on)x.lineTo(X(q),Y(q));else{const e=r[(i+1)%r.length];x.quadraticCurveTo(X(q),Y(q),X(e),Y(e));i++}}x.closePath()});x.fill('nonzero');if(sc>1){x.strokeStyle='#3B6FE0';x.beginPath();x.moveTo(0,c.height-300*k);x.lineTo(c.width,c.height-300*k);x.stroke();x.strokeStyle='#E3DDCF';x.strokeRect(5,0,gg.adv*k,c.height)}}
+function ed(i){const c=cells[i],g=S.p.glyphs[c.name];if(!g)return toast('برای این خانه نمونه‌ای استخراج نشده است. تصویر صفحهٔ مربوط را دوباره وارد کنید.',1);
+ const sl=(k,l,mn,mx,st)=>`<label class=f>${l}</label><input type=range min=${mn} max=${mx} step=${st} value=${g.t[k]} oninput="S.p.glyphs['${c.name}'].t.${k}=+this.value;dg($('#ec'),S.p.glyphs['${c.name}'],'${c.form}',2)">`;
+ M(`<h2>${esc(c.text)} · ${c.fn}</h2><canvas id=ec></canvas>${sl('dx','جابه‌جایی افقی',-200,200,5)}${sl('dy','خط مبنا (بالا/پایین)',-300,300,5)}${sl('s','اندازه',.5,1.6,.02)}${sl('aw','عرض (فاصلهٔ کناری)',-200,300,5)}
+ <div class=row><button class=b onclick="oke(${i})">تأیید</button><button class=bd onclick="dele(${i})">حذف نمونه</button></div><button class=b2 onclick="S.p.glyphs['${c.name}'].t={dx:0,dy:0,s:1,aw:0};ed(${i})">بازنشانی جابه‌جایی‌ها</button><button class=b2 onclick="cm();go('gl')">بستن</button>`);dg($('#ec'),g,c.form,2)}
+const oke=async i=>{S.p.glyphs[cells[i].name].ok=true;await save();cm();go('gl')},dele=async i=>{delete S.p.glyphs[cells[i].name];await save();cm();go('gl')};
+const okAll=async()=>{Object.values(S.p.glyphs).forEach(g=>g.ok=true);await save();go('gl')};
+
+async function mkFont(q){try{const G={};cells.forEach(c=>{const g=S.p.glyphs[c.name];if(g&&g.ok)G[c.name]=I.toGlyph(g.raw,c.form,g.t)});
+ if(!Object.keys(G).length){if(q)return null;H('<div class=card><b>هنوز گلیفی تأیید نشده است.</b><br>ابتدا نمونه‌ها را وارد و تأیید کنید.<button class=b onclick="go(\'gl\')">رفتن به گلیف‌ها</button></div>','پیش‌نمایش');return null}
+ const r=E.buildTTF({family:S.p.name,designer:S.p.designer,glyphs:G});S.font=r;const ff=new FontFace('HWuser',r.bytes.buffer.slice(0));await ff.load();document.fonts.add(ff);return r}catch(e){toast('ساخت فونت ناموفق بود: '+e.message+' — پشتیبان بگیرید و دوباره تلاش کنید.',1);return null}}
+function up(){const t=$('#in').value,pr=new Set(S.font.report.present),bad=[...new Set([...t].filter(ch=>{let cp=ch.codePointAt(0);cp=E.ALIAS[cp]||cp;const ty=E.LETTERS[cp];return ty&&E.FORMS[ty].some(f=>!pr.has(E.hex(cp)+'.'+f))}))];$('#wr').style.display=bad.length?'block':'none';$('#wr').textContent='⚠ این حروف شکل‌های ناقص دارند و ممکن است درست متصل نشوند: '+bad.join(' ');const st=`font-size:${$('#sz').value}px;line-height:${$('#lh').value/10}`;$('#pv').style.cssText=st+';font-family:HWuser,serif';$('#pv').textContent=t;const p2=$('#pv2');p2.style.display=$('#cp').checked?'block':'none';p2.style.cssText+=st;p2.textContent=t}
+async function outTTF(){const r=await mkFont();if(r){dl(new Blob([r.bytes],{type:'font/ttf'}),(S.p.name.replace(/\s+/g,'-')||'font')+'.ttf');toast('فایل TTF آماده شد')}}
+async function outBk(){const p=S.p,enc=new TextEncoder(),imgs=p.imgs||[],files=[{name:'project.json',data:enc.encode(JSON.stringify({...p,imgs:imgs.map(x=>({pg:x.pg,file:'images/page-'+(x.pg+1)+'.jpg'}))}))}];
+ for(const x of imgs)files.push({name:'images/page-'+(x.pg+1)+'.jpg',data:new Uint8Array(await x.blob.arrayBuffer())});const r=await mkFont(true);if(r)files.push({name:'font/font.ttf',data:r.bytes});
+ dl(Z.make(files),'backup-'+p.name.replace(/\s+/g,'-')+'.zip');toast('پشتیبان ZIP آماده شد')}
+async function outRep(){const r=await mkFont();if(!r)return;dl(new Blob([`گزارش فونت «${S.p.name}»\nگلیف‌های موجود: ${r.report.present.length}\nگلیف‌های ناقص: ${r.report.missing.length}\n\nناقص:\n${r.report.missing.join(', ')}\n\nموجود:\n${r.report.present.join(', ')}\n`],{type:'text/plain;charset=utf-8'}),'report.txt')}
+if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+go('home');
+</script></body></html>
