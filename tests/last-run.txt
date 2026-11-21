@@ -1,0 +1,40 @@
+=== node tests/test-font.js
+contour areas (y-up; outer must be negative=clockwise): [ -288587, 94864 ]
+otsu 158 cells extracted 88 of 88
+ttf bytes 39976 present 88 missing 58
+=== node tests/test-engine.js
+PASS تشخیص خودکار گوشه‌ها، خطای حداکثر 10.4 پیکسل
+PASS رفت‌وبرگشت ZIP
+=== python3 tests/shape.py
+PASS شکل‌دهی HarfBuzz ابتدا/میان/انتها + curs [(30, -10), (40, -10), (60, 0)]
+PASS شکل‌دهی HarfBuzz ابتدا+انتها [(40, 0), (60, 0)]
+PASS شکل‌دهی HarfBuzz ا مستقل، ب ابتدا، ا انتها [(30, 0), (40, 0), (60, 0)]
+PASS شکل‌دهی HarfBuzz نیم‌فاصله [(30, 0), (30, 0)]
+PASS شکل‌دهی HarfBuzz غیرمتصل‌شونده‌ها [(30, 0), (30, 0)]
+PASS شکل‌دهی HarfBuzz و ر [(30, 0), (30, 0)]
+PASS شکل‌دهی HarfBuzz پ چ ژ گ [(30, -10), (40, -10), (60, 0), (30, 0)]
+PASS شکل‌دهی HarfBuzz ك و ي عربی [(30, -10), (40, -10), (60, 0)]
+PASS شکل‌دهی HarfBuzz مستقل [(30, 0)]
+PASS شکل‌دهی HarfBuzz ارقام فارسی [(35, 0), (35, 0), (35, 0)]
+=== python3 tests/ui-smoke.py
+hub ok
+sheet canvas [1240, 1754]
+horizontal overflow: False
+glyphs/bytes/missing/fontLoaded [146, 58704, 0, True]
+editor opened
+persisted card visible
+reload keeps project
+sw controller: True | registrations: 1
+offline reload OK
+errors: []
+=== python3 tests/ui-pipeline.py
+camera capture -> corner UI OK; auto msg: تشخیص خودکار موفق نبود؛ گوشه‌ها را دستی 
+auto corners on skewed photo [True, [[110, 90], [1145, 130], [1115, 1645], [80, 1595]]]
+worker warp OK, threshold 141
+worker extract ->glyphs 88 imgs stored 1 True
+cancel -> corner UI back: True
+zip import -> [2, 88, True]
+warning shown for incomplete? True
+errors: []
+ALL TESTS PASSED
+exit code: 0
