@@ -9,7 +9,7 @@ with sync_playwright() as p:
     # عکس مصنوعی برگه با پرسپکتیو → worker → استخراج
     ok=pg.evaluate("""async()=>{const c=document.createElement('canvas');c.width=1240;c.height=1754;const x=c.getContext('2d');x.fillStyle='#555';x.fillRect(0,0,1240,1754);
      const q=[[110,90],[1150,130],[1120,1650],[80,1600]];x.fillStyle='#f2f2ee';x.beginPath();q.forEach((p,i)=>x[i?'lineTo':'moveTo'](...p));x.fill();
-     const t=document.createElement('canvas');t.width=I.PW;t.height=I.PH;const y=t.getContext('2d');y.fillStyle='#fff';y.fillRect(0,0,t.width,t.height);y.strokeStyle='#111';y.lineWidth=7;
+     const t=document.createElement('canvas');t.width=I.PW;t.height=I.PH;const y=t.getContext('2d');y.fillStyle='#fff';y.fillRect(0,0,t.width,t.height);y.strokeStyle='#999';y.lineWidth=2;for(let i=0;i<I.PER;i++){const b=I.cellBox(i);y.strokeRect(b.x,b.y,b.w,b.h)}y.strokeStyle='#111';y.lineWidth=7;
      for(let i=0;i<I.PER;i++){const a=I.exArea(i);y.beginPath();y.arc(a.x+a.w/2,a.y+a.h*.45,24,0,7);y.stroke()}
      // نگاشت دوخطی صفحه→چهارضلعی با رسم نوارهای افقی
      for(let r=0;r<I.PH;r+=2){const v=r/I.PH,L=[q[0][0]*(1-v)+q[3][0]*v,q[0][1]*(1-v)+q[3][1]*v],R=[q[1][0]*(1-v)+q[2][0]*v,q[1][1]*(1-v)+q[2][1]*v];x.save();x.setTransform((R[0]-L[0])/I.PW,(R[1]-L[1])/I.PW,0,1,L[0],L[1]);x.drawImage(t,0,r,I.PW,2,0,0,I.PW,2);x.restore()}

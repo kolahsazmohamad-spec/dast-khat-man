@@ -70,9 +70,14 @@
   function extract(g, W, t, ar) {
     const w = ar.w, h = ar.h, m = new Uint8Array(w * h); let ink = 0;
     for (let y = 3; y < h - 3; y++) for (let x = 3; x < w - 3; x++) if (g[(y + ar.y) * W + x + ar.x] < t) { m[y * w + x] = 1; ink++; }
+    const lb = new Int32Array(w * h); let id = 0;
+    for (let q = 0; q < m.length; q++) { if (!m[q] || lb[q]) continue; id++; const st = [q]; lb[q] = id; const px = []; let x0 = w, x1 = 0, y0 = h, y1 = 0;
+      while (st.length) { const k = st.pop(); px.push(k); const x = k % w, y = (k / w) | 0; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        for (const n of [k - 1, k + 1, k - w, k + w]) if (n >= 0 && n < m.length && m[n] && !lb[n] && !((n === k - 1 && x === 0) || (n === k + 1 && x === w - 1))) { lb[n] = id; st.push(n); } }
+      if (px.length < 14 || (y1 - y0 < 3 && x1 - x0 < 14)) { px.forEach(k => { m[k] = 0; ink--; }); } }
     if (ink < 25) return null;
     const cs = trace(m, w, h).filter(c => Math.abs(area(c)) >= 8).map(c => simplify(smooth(c, 3), 0.9)).filter(c => c.length >= 3);
-    return cs.length ? { contours: cs, base: 0.75 * h, ink } : null; }
+    return cs.length ? { contours: cs, base: ar.base != null ? ar.base : 0.75 * h, k: ar.k, ink } : null; }
 
   // چندضلعی ساده‌شده → منحنی درجه‌دوی TrueType: رأس‌های تیز on-curve، رأس‌های نرم off-curve با نقطهٔ میانی on-curve
   function quad(p) { const n = p.length, o = [];
@@ -81,7 +86,7 @@
       else { o.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, on: true }); o.push({ x: b.x, y: b.y, on: false }); } }
     return o; }
   /** raw → گلیف فونت. t: {dx,dy,s,aw}. وارونه‌شدن محور y خودبه‌خود خارجی‌ها را ساعتگرد می‌کند (استاندارد TrueType) */
-  function toGlyph(raw, form, t) { t = t || {}; const s = (t.s || 1) * K; let mn = 1e9, mx = -1e9;
+  function toGlyph(raw, form, t) { t = t || {}; const s = (t.s || 1) * (raw.k || K); let mn = 1e9, mx = -1e9;
     raw.contours.forEach(c => c.forEach(p => { mn = Math.min(mn, p[0]); mx = Math.max(mx, p[0]); }));
     const pad = form === 'isol' ? 60 : 0, dx = t.dx || 0, dy = t.dy || 0, W = (mx - mn) * s;
     const all = raw.contours.flat(), near = f => { const q = all.filter(f).map(p => p[1]).sort((a, b) => a - b); return q.length ? (raw.base - q[q.length >> 1]) * s + dy : 0; };
@@ -102,6 +107,61 @@
       if (n > bn) { bn = n; best = P; } }
     if (!best || bn < 0.2 * sw * sh) return null; return best.map(p => [p[0] * s, p[1] * s]); }
 
-  const api = { PW, PH, COLS, ROWS, PER, K, cellList, cellBox, exArea, warp, otsu, trace, extract, toGlyph, autoCorners, area };
+
+  // ───────── تشخیص جدول واقعی (مستقل از حاشیه‌ها و مقیاس چاپ) ─────────
+  const TOP = 28 / ((PH - GY - 60) / ROWS), BL = 0.7779; // ناحیهٔ برچسب و خط مبنا نسبت به ارتفاع خانه (مطابق طرح برگه)
+  function boxMean(a, W, H, r) { const S = new Float64Array((W + 1) * (H + 1)), o = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) { let s = 0; for (let x = 0; x < W; x++) { s += a[y * W + x]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + s; } }
+    for (let y = 0; y < H; y++) { const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+      for (let x = 0; x < W; x++) { const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
+        o[y * W + x] = (S[y1 * (W + 1) + x1] - S[y0 * (W + 1) + x1] - S[y1 * (W + 1) + x0] + S[y0 * (W + 1) + x0]) / ((x1 - x0) * (y1 - y0)); } }
+    return o; }
+  /** حذف اثر سایه و نور ناهمگون: تقسیم بر پس‌زمینهٔ محلی (کاغذ ≈ ۲۵۵) */
+  function normalize(g, W, H, r) { r = r || 30; const m = boxMean(g, W, H, r), b = new Float32Array(W * H);
+    for (let i = 0; i < b.length; i++) b[i] = Math.max(g[i], m[i]);
+    const bg = boxMean(b, W, H, r), o = new Uint8Array(W * H); for (let i = 0; i < o.length; i++) o[i] = Math.min(255, g[i] / Math.max(1, bg[i]) * 255); return o; }
+  function rotate(g, W, H, deg) { if (Math.abs(deg) < 0.03) return g; const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), cx = W / 2, cy = H / 2, o = new Uint8Array(W * H).fill(255);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const dx = x - cx, dy = y - cy, u = c * dx + s * dy + cx, v = -s * dx + c * dy + cy;
+      if (u < 0 || v < 0 || u >= W - 1 || v >= H - 1) continue; const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, p = y0 * W + x0;
+      o[y * W + x] = (g[p] * (1 - fx) + g[p + 1] * fx) * (1 - fy) + (g[p + W] * (1 - fx) + g[p + W + 1] * fx) * fy; } return o; }
+  function skewAngle(m, W, H) { const pts = []; for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) if (m[y * W + x]) pts.push(x, y);
+    const st = Math.max(2, 2 * Math.ceil(pts.length / 2 / 150000)), sc = a => { const s = Math.sin(a * Math.PI / 180), c = Math.cos(a * Math.PI / 180), h = new Float64Array(H + W + 8);
+      for (let i = 0; i < pts.length; i += st) h[Math.round(pts[i + 1] * c + pts[i] * s) + W / 2 | 0]++; let t = 0; for (const v of h) t += v * v; return t; };
+    let best = 0, bs = -1; for (let a = -5; a <= 5.001; a += 0.25) { const v = sc(a); if (v > bs) { bs = v; best = a; } }
+    for (let a = best - 0.25; a <= best + 0.251; a += 0.05) { const v = sc(a); if (v > bs) { bs = v; best = a; } } return best; }
+  function lineScores(m, W, H, horiz, minLen, gap) { const n = horiz ? H : W, L = horiz ? W : H, sc = new Float32Array(n);
+    for (let k = 0; k < n; k++) { let run = 0, g = 0, tot = 0;
+      for (let t = 0; t < L; t++) { const v = horiz ? m[k * W + t] : m[t * W + k];
+        if (v) { run += 1 + g; g = 0; } else if (run && g < gap) g++; else { if (run >= minLen) tot += run; run = 0; g = 0; } }
+      if (run >= minLen) tot += run; sc[k] = tot; } return sc; }
+  function dil(m, W, H, horiz, r) { const o = new Uint8Array(W * H); for (let d = -r; d <= r; d++) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const yy = horiz ? y + d : y, xx = horiz ? x : x + d; if (yy >= 0 && yy < H && xx >= 0 && xx < W && m[yy * W + xx]) o[y * W + x] = 1; } return o; }
+  function groups(sc, thr) { const out = []; let i = 0; while (i < sc.length) { if (sc[i] >= thr) { let sw = 0, s = 0, mx = 0, j = i; while (j < sc.length && sc[j] >= thr) { sw += sc[j]; s += sc[j] * j; mx = Math.max(mx, sc[j]); j++; } out.push({ p: s / sw, w: mx }); i = j; } else i++; } return out; }
+  /** n خط هم‌فاصله را از خطوط پیداشده انتخاب می‌کند (خطوط اضافی مثل لبهٔ کاغذ حذف، یک خط جاافتاده بازسازی می‌شود) */
+  function pickLines(gr, n) { if (gr.length < n - 1) return null; let best = null;
+    for (let i = 0; i < gr.length; i++) for (let j = i + 1; j < gr.length; j++) for (let m = 1; m <= n - 1; m++) { const d = (gr[j].p - gr[i].p) / m;
+      for (let k1 = 0; k1 + m <= n - 1; k1++) { const p0 = gr[i].p - k1 * d; let hit = 0, err = 0; const used = [];
+        for (let k = 0; k < n; k++) { const pk = p0 + k * d; let bi = -1, bd = 0.12 * d; gr.forEach((g, ix) => { const e = Math.abs(g.p - pk); if (e < bd) { bd = e; bi = ix; } }); if (bi >= 0) { hit++; err += bd; used.push([k, gr[bi].p]); } }
+        const score = hit * 1000 - err; if (!best || score > best.score) best = { score, hit, used }; } }
+    if (!best || best.hit < n - 1 || best.hit < 2) return null; const u = best.used, N = u.length; let sk = 0, sp = 0, skk = 0, skp = 0; u.forEach(([k, p]) => { sk += k; sp += p; skk += k * k; skp += k * p; });
+    const b = (N * skp - sk * sp) / (N * skk - sk * sk), a = (sp - b * sk) / N, pos = []; for (let k = 0; k < n; k++) { const f = u.find(x => x[0] === k); pos.push(f ? f[1] : a + b * k); } return { pos, hit: best.hit }; }
+  /** تشخیص جدول R×C روی تصویر نرمال‌شده؛ خروجی: تصویر صاف‌شده و grid={xs,ys,ok,msg,angle} */
+  function detectGrid(nr, W, H, R, C) {
+    const thr = 255 * 0.88, m0 = new Uint8Array(W * H); for (let i = 0; i < m0.length; i++) m0[i] = nr[i] < thr ? 1 : 0;
+    const ang = skewAngle(m0, W, H), img = rotate(nr, W, H, ang), m = new Uint8Array(W * H); for (let i = 0; i < m.length; i++) m[i] = img[i] < thr ? 1 : 0;
+    const hs = lineScores(dil(m, W, H, true, 2), W, H, true, 0.15 * W, 3), vs = lineScores(dil(m, W, H, false, 2), W, H, false, 0.12 * H, 3);
+    const gy = groups(hs, 0.15 * Math.max(...hs)), gx = groups(vs, 0.15 * Math.max(...vs)), py = pickLines(gy, R + 1), px = pickLines(gx, C + 1), g = { angle: ang, ok: false, msg: '' };
+    if (!px || !py) { g.msg = 'خطوط جدول به‌اندازهٔ کافی پیدا نشد (' + (px ? '' : 'ستون‌ها ') + (py ? '' : 'ردیف‌ها') + '). نور، سایه یا برش برگه را بررسی کنید یا مرز جدول را دستی تنظیم کنید.'; g.xs = px ? px.pos : lin(0.06 * W, 0.94 * W, C); g.ys = py ? py.pos : lin(0.07 * H, 0.93 * H, R); return { img, grid: g }; }
+    g.xs = px.pos; g.ys = py.pos; g.hitX = px.hit; g.hitY = py.hit; const cw = (g.xs[C] - g.xs[0]) / C, ch = (g.ys[R] - g.ys[0]) / R, ratio = cw / ch;
+    if (ratio < 0.6 || ratio > 1.7 || (g.xs[C] - g.xs[0]) < 0.5 * W) g.msg = 'شکل جدول تشخیص‌داده‌شده با برگهٔ نمونه نمی‌خواند؛ مرز جدول را دستی تنظیم کنید.';
+    else { g.ok = true; g.msg = 'جدول با ' + (C + 1 - g.hitX + R + 1 - g.hitY ? 'بازسازی ' + (C + 1 - g.hitX + R + 1 - g.hitY) + ' خط جاافتاده و ' : '') + 'چرخش ' + ang.toFixed(1) + '° شناسایی شد.'; }
+    return { img, grid: g }; }
+  const lin = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n);
+  /** ناحیهٔ استخراج خانهٔ i با مختصات واقعی جدول؛ برچسب بالا، خط مبنا و حاشیه‌ها خارج‌اند */
+  function gridArea(grid, i) { const j = i % PER, c = COLS - 1 - (j % COLS), r = Math.floor(j / COLS), x0 = grid.xs[c], x1 = grid.xs[c + 1], y0 = grid.ys[r], y1 = grid.ys[r + 1], w = x1 - x0, h = y1 - y0, ix = Math.max(5, 0.05 * w), top = y0 + TOP * h, bot = y1 - Math.max(5, 0.035 * h);
+    return { x: Math.round(x0 + ix), y: Math.round(top), w: Math.round(w - 2 * ix), h: Math.round(bot - top), base: (BL - TOP) * h, k: 800 / ((BL - TOP) * h) }; }
+  const rowsOf = pg => Math.ceil((Math.min(cellList().length, (pg + 1) * PER) - pg * PER) / COLS);
+
+  const api = { PW, PH, COLS, ROWS, PER, K, cellList, cellBox, exArea, warp, otsu, trace, extract, toGlyph, autoCorners, normalize, rotate, detectGrid, gridArea, rowsOf, lin, BL, TOP, area };
   if (typeof module !== 'undefined') module.exports = api; else root.ImageEngine = api;
 })(typeof self !== 'undefined' ? self : this);

@@ -11,7 +11,7 @@ trap 'kill $SRV 2>/dev/null; wait $SRV 2>/dev/null' EXIT
 for i in $(seq 1 50); do (exec 3<>/dev/tcp/127.0.0.1/$PORT) 2>/dev/null && break; sleep 0.1; done
 kill -0 $SRV 2>/dev/null || { echo "FAILED: سرور آزمایشی راه‌اندازی نشد"; exit 2; }
 fail=0
-for t in "node tests/test-font.js" "node tests/test-engine.js" "python3 tests/shape.py" "python3 tests/ui-smoke.py" "python3 tests/ui-pipeline.py"; do
+for t in "node tests/test-font.js" "node tests/test-engine.js" "node tests/test-grid.js" "python3 tests/shape.py" "python3 tests/ui-smoke.py" "python3 tests/ui-pipeline.py" "python3 tests/sheet-photo.py"; do
   echo "=== $t"
   out=$($t 2>&1); rc=$?
   printf '%s\n' "$out" | grep -v '^  ' || true

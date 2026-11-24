@@ -95,7 +95,7 @@ async function imp(f){if(!f)return;try{let p;if(/\.zip$/i.test(f.name)){const z=
  if(!p.id||!p.glyphs)throw 0;const ex=(await all()).find(x=>x.id===p.id);if(ex&&!confirm('پروژه‌ای با همین شناسه وجود دارد. جایگزین شود؟'))return;await put(p);toast('پروژه بازیابی شد');go('home')}catch(e){toast('فایل پشتیبان معتبر نیست. فایل ZIP یا JSON ساخته‌شده توسط همین برنامه را انتخاب کنید.',1)}}
 function drawSheet(c,pg){c.width=I.PW;c.height=I.PH;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.direction='rtl';x.textAlign='right';
  x.fillStyle='#1B2A6B';x.font='700 34px sans-serif';x.fillText('برگهٔ نمونه‌نویسی — صفحهٔ '+fa(pg+1)+' از '+fa(NP),I.PW-60,70);x.fillStyle='#777';x.font='20px sans-serif';x.fillText('با خودکار آبی یا مشکی داخل خانه بنویسید؛ بالای خط مبنا و زیر آن، بدون لمس لبه‌ها (جز خط اتصال)',I.PW-60,106);
- for(let i=pg*I.PER;i<Math.min(cells.length,(pg+1)*I.PER);i++){const b=I.cellBox(i),a=I.exArea(i),c0=cells[i];x.strokeStyle='#bbb';x.lineWidth=1.5;x.strokeRect(b.x,b.y,b.w,b.h);
+ for(let i=pg*I.PER;i<pg*I.PER+I.rowsOf(pg)*I.COLS;i++){const b=I.cellBox(i),a=I.exArea(i),c0=cells[i];x.strokeStyle='#bbb';x.lineWidth=1.5;x.strokeRect(b.x,b.y,b.w,b.h);if(!c0)continue;
  x.strokeStyle='#ccc';x.setLineDash([6,5]);x.beginPath();x.moveTo(a.x,a.y+.75*a.h);x.lineTo(a.x+a.w,a.y+.75*a.h);x.stroke();x.setLineDash([]);
  x.fillStyle='#888';x.font='22px sans-serif';x.textAlign='right';x.fillText(c0.text+'  '+c0.fn,b.x+b.w-8,b.y+22);}}
 
@@ -115,16 +115,26 @@ let WK;const wk=()=>{if(WK)WK.terminate();return WK=new Worker('workers/image-wo
 const busy=m=>$('#ws').innerHTML=`<div class=card><b id=bt>${m}</b><div class=bar style="margin:8px 0"><i id=bi style="width:5%"></i></div><button class=bd onclick="stopW()">لغو</button></div>`;
 function stopW(){if(WK){WK.terminate();WK=null}toast('عملیات لغو شد');S.src&&cornerUI()}
 const wErr=()=>{WK=null;toast('پردازش تصویر ناموفق بود. گوشه‌ها را دوباره تنظیم کنید یا عکس واضح‌تری بگیرید.',1);S.src&&cornerUI()};
-function proc(){busy('در حال اصلاح پرسپکتیو…');const w=wk();w.onerror=wErr;w.onmessage=e=>{WK=null;S.wg=e.data.wg;S.t=Math.max(60,Math.min(200,e.data.t-8));
- $('#ws').innerHTML=`<h2>بررسی برش و آستانه</h2><p class=mut>کادرهای آبی باید روی خانه‌های برگه بیفتند؛ در غیر این صورت به مرحلهٔ قبل برگردید و گوشه‌ها را اصلاح کنید.</p><canvas id=pc2></canvas><label class=f>آستانهٔ سیاه‌وسفید</label><input id=th type=range min=40 max=220 value=${S.t} oninput="S.t=+this.value;bin()"><div class=row><button class=b2 onclick="cornerUI()">بازگشت</button><button class=b onclick="ext()">استخراج نمونه‌ها</button></div>`;bin()};
- w.postMessage({type:'warp',g:S.src.g,w:S.src.w,h:S.src.h,q:S.q})}
-function bin(){const c=$('#pc2'),W=I.PW,s=.5;c.width=W*s;c.height=I.PH*s;const x=c.getContext('2d'),im=x.createImageData(c.width,c.height);for(let y=0;y<c.height;y++)for(let u=0;u<c.width;u++){const v=S.wg[(y*2)*W+u*2]<S.t?20:255,k=(y*c.width+u)*4;im.data[k]=im.data[k+1]=im.data[k+2]=v;im.data[k+3]=255}x.putImageData(im,0,0);x.strokeStyle='#3B6FE0';
- for(let i=S.pg*I.PER;i<Math.min(cells.length,(S.pg+1)*I.PER);i++){const a=I.exArea(i);x.strokeRect(a.x*s,a.y*s,a.w*s,a.h*s)}}
-function ext(){busy('در حال استخراج نمونه‌ها…');const w=wk(),from=S.pg*I.PER,to=Math.min(cells.length,from+I.PER);w.onerror=wErr;
+function proc(){busy('در حال اصلاح پرسپکتیو و تشخیص جدول…');S.R=I.rowsOf(S.pg);const w=wk();w.onerror=wErr;w.onmessage=e=>{WK=null;S.wg=e.data.wg;S.grid=e.data.grid;S.gridOk=S.grid.ok;S.t=Math.max(60,Math.min(200,e.data.t-8));
+ $('#ws').innerHTML=`<h2>بررسی جدول و آستانه</h2><p id=gm></p><canvas id=pc2></canvas><p class=mut>کادر سبز = خطوط جدول تشخیص‌داده‌شده؛ کادر آبی = ناحیهٔ استخراج هر خانه (پایین‌تر از برچسب و دور از خطوط). برای اصلاح، دایره‌های چهار گوشهٔ جدول را بکشید.</p>
+ <button class=b2 id=cfb onclick="S.gridOk=true;S.grid.msg='مرز جدول به‌صورت دستی تأیید شد.';gmsg();bin()">تأیید مرز جدول به‌صورت دستی</button><label class=f>آستانهٔ سیاه‌وسفید</label><input id=th type=range min=40 max=220 value=${S.t} oninput="S.t=+this.value;bin()">
+ <div class=row><button class=b2 onclick="cornerUI()">بازگشت</button><button class=b id=eb onclick="ext()">استخراج نمونه‌ها</button></div>`;gridUI();gmsg();bin()};
+ w.postMessage({type:'warp',g:S.src.g,w:S.src.w,h:S.src.h,q:S.q,R:S.R})}
+function gmsg(){const g=S.grid,m=$('#gm');m.style.cssText='padding:10px;border-radius:10px;font-weight:700;'+(S.gridOk?'background:#e6f4ec;color:#2E7D4F':'background:#fdecea;color:#B3261E');m.textContent=(S.gridOk?'✓ ':'✗ ')+g.msg+(S.gridOk?'':' استخراج تا تأیید دستی جدول غیرفعال است.');$('#eb').disabled=!S.gridOk;$('#eb').style.opacity=S.gridOk?1:.5;$('#cfb').style.display=S.gridOk?'none':'flex'}
+function gridUI(){const c=$('#pc2'),C=I.COLS;let dr=-1;const cor=()=>{const g=S.grid;return[[g.xs[0],g.ys[0]],[g.xs[C],g.ys[0]],[g.xs[C],g.ys[S.R]],[g.xs[0],g.ys[S.R]]]};
+ const pt=e=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)*c.width/r.width*2,(e.clientY-r.top)*c.height/r.height*2]};
+ c.onpointerdown=e=>{const p=pt(e);let m=1e9;cor().forEach((q,i)=>{const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<m){m=d;dr=i}});if(m>120){dr=-1;return}c.setPointerCapture(e.pointerId)};
+ c.onpointermove=e=>{if(dr<0)return;const p=pt(e),g=S.grid;let x0=g.xs[0],x1=g.xs[C],y0=g.ys[0],y1=g.ys[S.R];if(dr==0||dr==3)x0=p[0];else x1=p[0];if(dr<2)y0=p[1];else y1=p[1];if(x1-x0<200||y1-y0<200)return;
+  g.xs=I.lin(x0,x1,C);g.ys=I.lin(y0,y1,S.R);g.manual=true;bin()};c.onpointerup=()=>dr=-1}
+function bin(){const c=$('#pc2'),W=I.PW,s=.5;c.width=W*s;c.height=I.PH*s;const x=c.getContext('2d'),im=x.createImageData(c.width,c.height);for(let y=0;y<c.height;y++)for(let u=0;u<c.width;u++){const v=S.wg[(y*2)*W+u*2]<S.t?20:255,k=(y*c.width+u)*4;im.data[k]=im.data[k+1]=im.data[k+2]=v;im.data[k+3]=255}x.putImageData(im,0,0);
+ const g=S.grid;x.strokeStyle='#2E9E5B';x.lineWidth=1;g.xs.forEach(v=>{x.beginPath();x.moveTo(v*s,g.ys[0]*s);x.lineTo(v*s,g.ys[S.R]*s);x.stroke()});g.ys.forEach(v=>{x.beginPath();x.moveTo(g.xs[0]*s,v*s);x.lineTo(g.xs[I.COLS]*s,v*s);x.stroke()});
+ x.strokeStyle='#3B6FE0';for(let i=S.pg*I.PER;i<Math.min(cells.length,S.pg*I.PER+S.R*I.COLS);i++){const a=I.gridArea(g,i);x.strokeRect(a.x*s,a.y*s,a.w*s,a.h*s)}
+ x.fillStyle='rgba(224,59,59,.55)';[[g.xs[0],g.ys[0]],[g.xs[I.COLS],g.ys[0]],[g.xs[I.COLS],g.ys[S.R]],[g.xs[0],g.ys[S.R]]].forEach(q=>{x.beginPath();x.arc(q[0]*s,q[1]*s,14,0,7);x.fill()})}
+function ext(){if(!S.gridOk)return toast('جدول تأیید نشده است؛ ابتدا مرز جدول را تنظیم و تأیید کنید.',1);busy('در حال استخراج نمونه‌ها…');const w=wk(),from=S.pg*I.PER,to=Math.min(cells.length,from+I.PER);w.onerror=wErr;
  w.onmessage=async e=>{const m=e.data;if(m.type==='prog'){$('#bi').style.width=m.p+'%';$('#bt').textContent='در حال استخراج… '+fa(m.p)+'٪';return}WK=null;let n=0;
   for(const[i,r]of m.res){if(r){S.p.glyphs[cells[i].name]={raw:r,t:{dx:0,dy:0,s:1,aw:0},ok:false};n++}else delete S.p.glyphs[cells[i].name]}
   if(S.blob)S.p.imgs=(S.p.imgs||[]).filter(x=>x.pg!==S.pg).concat([{pg:S.pg,blob:S.blob}]);await save();toast(fa(n)+' نمونه استخراج شد. لطفاً آن‌ها را بررسی و تأیید کنید.');go('gl')};
- w.postMessage({type:'ext',wg:S.wg,t:S.t,from,to})}
+ w.postMessage({type:'ext',wg:S.wg,t:S.t,from,to,grid:S.grid})}
 function dg(c,g,form,sc){const gg=I.toGlyph(g.raw,form,g.t);sc=sc||1;const hgt=1100;c.height=sc>1?300:64;const k=c.height/hgt;c.width=Math.max(20,gg.adv*k+10);const x=c.getContext('2d');x.fillStyle='#222';x.beginPath();
  gg.contours.forEach(r=>{const X=p=>5+p.x*k,Y=p=>c.height-(p.y+300)*k;x.moveTo(X(r[0]),Y(r[0]));for(let i=1;i<=r.length;i++){const q=r[i%r.length];if(q.on)x.lineTo(X(q),Y(q));else{const e=r[(i+1)%r.length];x.quadraticCurveTo(X(q),Y(q),X(e),Y(e));i++}}x.closePath()});x.fill('nonzero');if(sc>1){x.strokeStyle='#3B6FE0';x.beginPath();x.moveTo(0,c.height-300*k);x.lineTo(c.width,c.height-300*k);x.stroke();x.strokeStyle='#E3DDCF';x.strokeRect(5,0,gg.adv*k,c.height)}}
 function ed(i){const c=cells[i],g=S.p.glyphs[c.name];if(!g)return toast('برای این خانه نمونه‌ای استخراج نشده است. تصویر صفحهٔ مربوط را دوباره وارد کنید.',1);
